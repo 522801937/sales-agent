@@ -1,0 +1,67 @@
+test 1：
+import json
+
+import requests
+
+
+def test_chat_api():
+    url = "xx"
+    params = {"query": "你们公司有哪些产品？"}
+
+    try:
+        response = requests.get(url, params=params, timeout=60)
+        print(f"Status Code: {response.status_code}")
+
+        try:
+            data = response.json()
+            print("Response JSON:")
+            print(json.dumps(data, ensure_ascii=False, indent=2))
+        except ValueError:
+            print("Response Text:")
+            print(response.text)
+    except requests.RequestException as exc:
+        print(f"Request failed: {exc}")
+
+
+if __name__ == "__main__":
+    test_chat_api()
+main.py:
+import os
+
+import requests
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Query
+
+load_dotenv()
+
+app = FastAPI()
+
+
+@app.get("/chat")
+def chat(query: str = Query(..., min_length=1)):
+    dify_api_key = os.getenv("DIFY_API_KEY")
+    dify_base_url = os.getenv("DIFY_BASE_URL")
+
+    if not dify_api_key or not dify_base_url:
+        raise HTTPException(status_code=500, detail="Missing Dify configuration in .env")
+
+    url = f"{dify_base_url.rstrip('/')}/chat-messages"
+    headers = {
+        "Authorization": f"Bearer {dify_api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "inputs": {},
+        "query": query,
+        "response_mode": "blocking",
+        "user": "abc-123",
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Dify request failed: {exc}") from exc
+
+    return response.json()
+
